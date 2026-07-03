@@ -1,101 +1,108 @@
 import os
-import json
 from datetime import datetime
+from io import BytesIO
 from tools.fetch_tool import fetch_page
 from tools.analyze_tool import analyze_page
 
-# Initialize
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+)
+
 MODEL_ID = "gemini-1.5-flash-latest"
 
+# ---------------- APPROVAL NODE ----------------
 def approval_node(violations: list[dict]) -> dict:
-    """Human-in-the-loop: approve/reject fixes."""
     approved_fixes = []
     rejected_fixes = []
-    
+
     print("\n" + "="*50)
     print("APPROVAL REVIEW")
     print("="*50 + "\n")
-    
+
     for i, violation in enumerate(violations, 1):
         print(f"[{i}] {violation['type'].upper()}")
         print(f"    Severity: {violation['severity']}")
         print(f"    Suggestion: {violation['suggestion']}")
         print(f"    Element: {violation['element'][:100]}...")
-        
+
         response = "y"
-        
+
         if response.lower() == 'y':
             approved_fixes.append(violation)
             print("    ✓ APPROVED\n")
         else:
             rejected_fixes.append(violation)
             print("    ✗ REJECTED\n")
-    
+
     return {
         'approved': approved_fixes,
         'rejected': rejected_fixes,
         'total_approved': len(approved_fixes)
     }
 
+# ---------------- FIX NODE ----------------
 def fix_node(approved_violations: list[dict]) -> list[dict]:
-    """Generate HTML fixes (mocked)."""
     fixes = []
-    
+
     print("\n" + "="*50)
     print("GENERATING FIXES (MOCKED)")
     print("="*50 + "\n")
-    
+
     mock_fixes = {
         'missing_meta_description': '<meta name="description" content="Example Domain - A demonstration website">',
         'missing_alt_text': '<img src="image.jpg" alt="Descriptive image text">',
         'empty_h1': '<h1>Example Domain</h1>',
+        'missing_h1': '<h1>Page Title</h1>',
         'poor_anchor_text': '<a href="/about">About Us</a>',
         'missing_lang_attribute': '<html lang="en">',
         'potential_contrast_issue': '/* Improved contrast: #000 on #fff */'
     }
-    
+
     for violation in approved_violations:
         vtype = violation['type']
         fixed = mock_fixes.get(vtype, f"<!-- Fixed: {vtype} -->")
-        
+
         fixes.append({
             'type': vtype,
             'original': violation['element'],
             'fixed': fixed,
             'severity': violation['severity']
         })
-        
+
         print(f"[{len(fixes)}] {vtype}")
         print(f"    ✓ Mock fix generated\n")
-    
+
     return fixes
 
+# ---------------- EVALUATE NODE ----------------
 def evaluate_node(violations: list[dict], fixes: list[dict]) -> dict:
-    """Calculate compliance score."""
     total_violations = len(violations)
     fixes_generated = len(fixes)
-    
+
     if total_violations == 0:
         score = 100.0
     else:
         score = (fixes_generated / total_violations) * 100
-    
+
     return {
-        'score_before': 100 - (total_violations * 10),  # Simplified scoring
+        'score_before': 100 - (total_violations * 10),
         'score_after': 100 - ((total_violations - fixes_generated) * 10),
         'total_issues': total_violations,
         'issues_fixed': fixes_generated,
         'compliance_percentage': score
     }
 
+# ---------------- MARKDOWN REPORT (kept for reference/download option) ----------------
 def report_node(url: str, violations: list[dict], fixes: list[dict], evaluation: dict) -> str:
-    """Generate markdown report."""
-    
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+
     report = f"""# Site Doctor Accessibility Audit Report
 
-**Date:** {timestamp}  
+**Date:** {timestamp}
 **URL Scanned:** {url}
 
 ---
@@ -115,14 +122,13 @@ def report_node(url: str, violations: list[dict], fixes: list[dict], evaluation:
 ## Issues Found
 
 """
-    
     if violations:
         for i, violation in enumerate(violations, 1):
             report += f"""### {i}. {violation['type'].replace('_', ' ').title()}
 
 - **Severity:** {violation['severity'].upper()}
 - **Issue:** {violation['suggestion']}
-- **Current Element:** 
+- **Current Element:**
 ```html
 {violation['element']}
 ```
@@ -130,9 +136,9 @@ def report_node(url: str, violations: list[dict], fixes: list[dict], evaluation:
 """
     else:
         report += "✓ No accessibility issues found!\n\n"
-    
+
     report += "---\n\n## Recommended Fixes\n\n"
-    
+
     if fixes:
         for i, fix in enumerate(fixes, 1):
             report += f"""### Fix {i}: {fix['type'].replace('_', ' ').title()}
@@ -150,7 +156,7 @@ def report_node(url: str, violations: list[dict], fixes: list[dict], evaluation:
 """
     else:
         report += "No fixes generated.\n\n"
-    
+
     report += """---
 
 ## Compliance Notes
@@ -164,42 +170,147 @@ def report_node(url: str, violations: list[dict], fixes: list[dict], evaluation:
 
 *Generated by Site Doctor AI Agent*
 """
-    
     return report
 
+# ---------------- PDF REPORT (NEW) ----------------
+def generate_pdf_report(url: str, violations: list[dict], fixes: list[dict], evaluation: dict) -> bytes:
+    """Generate a professional PDF report and return it as bytes."""
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=letter,
+        topMargin=0.6*inch, bottomMargin=0.6*inch,
+        leftMargin=0.6*inch, rightMargin=0.6*inch
+    )
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle('TitleStyle', parent=styles['Title'], fontSize=20, spaceAfter=6)
+    meta_style = ParagraphStyle('MetaStyle', parent=styles['Normal'], fontSize=9, textColor=colors.grey)
+    h2_style = ParagraphStyle('H2Style', parent=styles['Heading2'], fontSize=14, spaceBefore=14, spaceAfter=8)
+    h3_style = ParagraphStyle('H3Style', parent=styles['Heading3'], fontSize=11, spaceBefore=10, spaceAfter=4)
+    body_style = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontSize=10, leading=14)
+    code_style = ParagraphStyle(
+        'CodeStyle', parent=styles['Normal'], fontName='Courier', fontSize=8.5,
+        backColor=colors.whitesmoke, borderPadding=6, leading=11
+    )
+
+    story = []
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Header
+    story.append(Paragraph("Site Doctor Accessibility Audit Report", title_style))
+    story.append(Paragraph(f"Date: {timestamp}", meta_style))
+    story.append(Paragraph(f"URL Scanned: {url}", meta_style))
+    story.append(Spacer(1, 12))
+    story.append(HRFlowable(width="100%", color=colors.lightgrey))
+    story.append(Spacer(1, 12))
+
+    # Executive Summary Table
+    story.append(Paragraph("Executive Summary", h2_style))
+    table_data = [
+        ["Metric", "Value"],
+        ["Total Issues Found", str(evaluation['total_issues'])],
+        ["Issues Fixed", str(evaluation['issues_fixed'])],
+        ["Compliance Score Before", f"{evaluation['score_before']}/100"],
+        ["Compliance Score After", f"{evaluation['score_after']}/100"],
+        ["Improvement", f"+{evaluation['compliance_percentage']:.1f}%"],
+    ]
+    table = Table(table_data, colWidths=[3*inch, 2.5*inch])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.whitesmoke]),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(table)
+    story.append(Spacer(1, 16))
+
+    # Issues Found
+    story.append(Paragraph("Issues Found", h2_style))
+    if violations:
+        for i, v in enumerate(violations, 1):
+            title = v['type'].replace('_', ' ').title()
+            story.append(Paragraph(f"{i}. {title}", h3_style))
+            story.append(Paragraph(f"<b>Severity:</b> {v['severity'].upper()}", body_style))
+            story.append(Paragraph(f"<b>Issue:</b> {v['suggestion']}", body_style))
+            element_text = v['element'][:150].replace('<', '&lt;').replace('>', '&gt;')
+            story.append(Paragraph(f"<b>Current Element:</b>", body_style))
+            story.append(Paragraph(element_text, code_style))
+            story.append(Spacer(1, 6))
+    else:
+        story.append(Paragraph("No accessibility issues found.", body_style))
+
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width="100%", color=colors.lightgrey))
+
+    # Recommended Fixes
+    story.append(Paragraph("Recommended Fixes", h2_style))
+    if fixes:
+        for i, fix in enumerate(fixes, 1):
+            title = fix['type'].replace('_', ' ').title()
+            story.append(Paragraph(f"Fix {i}: {title}", h3_style))
+            before_text = fix['original'][:150].replace('<', '&lt;').replace('>', '&gt;')
+            after_text = fix['fixed'][:150].replace('<', '&lt;').replace('>', '&gt;')
+            story.append(Paragraph("<b>Before:</b>", body_style))
+            story.append(Paragraph(before_text, code_style))
+            story.append(Spacer(1, 4))
+            story.append(Paragraph("<b>After:</b>", body_style))
+            story.append(Paragraph(after_text, code_style))
+            story.append(Spacer(1, 8))
+    else:
+        story.append(Paragraph("No fixes generated.", body_style))
+
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width="100%", color=colors.lightgrey))
+
+    # Compliance Notes
+    story.append(Paragraph("Compliance Notes", h2_style))
+    notes = [
+        "Automated scanning detected common accessibility violations",
+        "All fixes require human review before deployment",
+        "Additional manual testing recommended for full WCAG compliance",
+        "Color contrast issues require manual assessment",
+    ]
+    for note in notes:
+        story.append(Paragraph(f"• {note}", body_style))
+
+    story.append(Spacer(1, 16))
+    story.append(Paragraph("Generated by Site Doctor AI Agent", meta_style))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.read()
+
+# ---------------- MAIN AGENT RUNNER ----------------
 def run_agent(url: str):
-    """Run the complete Site Doctor workflow."""
-    
-    # Step 1: Fetch
     print(f"[1] Fetching {url}...")
     html = fetch_page(url)
-    
-    # Step 2: Analyze
+
     print("[2] Analyzing violations...")
     violations = analyze_page(html)
-    
-    # Step 3: Classify
+
     print("[3] Classifying violations...")
     auto_fixable = [v for v in violations if v['auto_fixable']]
     needs_approval = [v for v in violations if not v['auto_fixable']]
-    
-    # Step 4: Approval
+
     print("[4] Human approval review...")
     approval_result = approval_node(auto_fixable + needs_approval)
-    
-    # Step 5: Fix Generation
+
     print("[5] Generating fixes...")
     fixes = fix_node(approval_result['approved'])
-    
-    # Step 6: Evaluation
+
     print("[6] Evaluating compliance...")
     evaluation = evaluate_node(violations, fixes)
-    
-    # Step 7: Report
+
     print("[7] Generating report...")
-    report = report_node(url, violations, fixes, evaluation)
-    
-    # Output
+    markdown_report = report_node(url, violations, fixes, evaluation)
+    pdf_bytes = generate_pdf_report(url, violations, fixes, evaluation)
+
     print("="*50)
     print(f"WORKFLOW COMPLETE")
     print("="*50)
@@ -208,21 +319,23 @@ def run_agent(url: str):
     print(f"Fixes generated: {len(fixes)}")
     print(f"Compliance Score: {evaluation['score_after']}/100")
     print("="*50 + "\n")
-    
-    # Save report
-    report_filename = "site_doctor_report.md"
-    with open(report_filename, 'w') as f:
-        f.write(report)
-    
-    print(f"✓ Report saved to: {report_filename}\n")
-    
+
+    with open("site_doctor_report.md", 'w', encoding='utf-8') as f:
+        f.write(markdown_report)
+
+    with open("site_doctor_report.pdf", 'wb') as f:
+        f.write(pdf_bytes)
+
+    print("✓ Report saved to: site_doctor_report.md and site_doctor_report.pdf\n")
+
     return {
         'violations': violations,
         'approval': approval_result,
         'fixes': fixes,
         'evaluation': evaluation,
-        'report': report
+        'report': markdown_report,
+        'pdf_bytes': pdf_bytes
     }
 
 if __name__ == "__main__":
-    result = run_agent("https://example.com")
+    result = run_agent("https://bbc.com")

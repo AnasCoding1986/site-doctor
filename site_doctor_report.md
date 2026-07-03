@@ -1,7 +1,7 @@
 # Site Doctor Accessibility Audit Report
 
-**Date:** 2026-07-02 05:34:10  
-**URL Scanned:** https://example.com
+**Date:** 2026-07-03 20:23:54
+**URL Scanned:** dialoguedock.vercel.app
 
 ---
 
@@ -9,9 +9,9 @@
 
 | Metric | Value |
 |--------|-------|
-| Total Issues Found | 2 |
-| Issues Fixed | 2 |
-| Compliance Score Before | 80/100 |
+| Total Issues Found | 3 |
+| Issues Fixed | 3 |
+| Compliance Score Before | 70/100 |
 | Compliance Score After | 100/100 |
 | Improvement | +100.0% |
 
@@ -19,29 +19,50 @@
 
 ## Issues Found
 
-### 1. Missing Meta Description
+### 1. Missing H1
+
+- **Severity:** HIGH
+- **Issue:** Add an <h1> tag with main page title
+- **Current Element:**
+```html
+<h1> (missing)</h1>
+```
+
+### 2. Missing Meta Description
 
 - **Severity:** MEDIUM
 - **Issue:** Add meta description tag
-- **Current Element:** 
+- **Current Element:**
 ```html
 <meta name="description" (missing)>
 ```
 
-### 2. Potential Contrast Issue
+### 3. Missing Lang Attribute
 
-- **Severity:** LOW
-- **Issue:** Review color contrast ratios manually
-- **Current Element:** 
+- **Severity:** MEDIUM
+- **Issue:** Add lang="en" to <html> tag
+- **Current Element:**
 ```html
-<style>...</style>
+<html>
 ```
 
 ---
 
 ## Recommended Fixes
 
-### Fix 1: Missing Meta Description
+### Fix 1: Missing H1
+
+**Before:**
+```html
+<h1> (missing)</h1>
+```
+
+**After:**
+```html
+<h1>Page Title</h1>
+```
+
+### Fix 2: Missing Meta Description
 
 **Before:**
 ```html
@@ -53,16 +74,16 @@
 <meta name="description" content="Example Domain - A demonstration website">
 ```
 
-### Fix 2: Potential Contrast Issue
+### Fix 3: Missing Lang Attribute
 
 **Before:**
 ```html
-<style>...</style>
+<html>
 ```
 
 **After:**
 ```html
-/* Improved contrast: #000 on #fff */
+<html lang="en">
 ```
 
 ---
