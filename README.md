@@ -26,7 +26,7 @@ A Google ADK 2.0 agent that automatically audits websites for accessibility viol
 cd site-doctor
 
 # Install dependencies
-uv add google-adk httpx beautifulsoup4 rich python-dotenv
+uv add google-adk httpx beautifulsoup4 rich python-dotenv reportlab
 
 # Create .env with your API key
 echo "GOOGLE_API_KEY=your_key_here" > .env
@@ -37,10 +37,8 @@ uv run python agent.py
 
 ### Output
 
-Generates `site_doctor_report.md` with:
-- Issues found & severity
-- Before/after HTML snippets
-- Compliance score improvement
-- Actionable recommendations
+Generates:
+- `site_doctor_report.md` (Markdown summary)
+- `site_doctor_report.pdf` (Professional enterprise PDF report featuring metric cards, severity badges, preformatted wrapped code blocks, and dynamic page numbering)
 
 ## Architecture
